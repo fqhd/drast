@@ -17,3 +17,4 @@ temp.avi
 *.pth
 training_data
 __pycache__
+output.bin
