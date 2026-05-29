@@ -14,43 +14,55 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            bin: drast
-            renamed_bin: drast_linux_x86_64_bin
-            asset_name: drast_linux_x86_64_bin
-          - os: windows-latest
-            target: x86_64-pc-windows-gnu
-            bin: drast.exe
-            renamed_bin: drast_windows_x86_64_bin.exe
-            asset_name: drast_windows_x86_64_bin.exe
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            bin: drast
-            renamed_bin: drast_macos_x86_64_bin
-            asset_name: drast_macos_x86_64_bin
+      include:
+        - os: ubuntu-latest
+          renamed_bin: output_linux_x86_64_bin
+          asset_name: output_linux_x86_64_bin
+        - os: windows-latest
+          renamed_bin: output_windows_x86_64_bin.exe
+          asset_name: output_windows_x86_64_bin.exe
+        - os: macos-latest
+          renamed_bin: output_macos_x86_64_bin
+          asset_name: output_macos_x86_64_bin
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          target: ${{ matrix.target }}
+      - name: Install clang
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            choco install llvm
+          else
+            sudo apt-get update && sudo apt-get install -y clang
+          fi
+        shell: bash
 
-      - name: Build release
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build C file
+        run: clang src/main.c -o output.bin
+        shell: bash
+
+      - name: Verify build succeeded
+        run: |
+          if [ ! -f "output.bin" ]; then
+            echo "Build failed - output.bin not found"
+            exit 1
+          fi
+          echo "Build successful!"
+        shell: bash
 
       - name: Rename binary
         run: |
-          mv target/${{ matrix.target }}/release/${{ matrix.bin }} target/${{ matrix.target }}/release/${{ matrix.renamed_bin }}
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            mv output.bin ${{ matrix.renamed_bin }}
+          else
+            mv output.bin ${{ matrix.renamed_bin }}
+          fi
+        shell: bash
 
       - name: Upload binary to GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/${{ matrix.target }}/release/${{ matrix.renamed_bin }}
+          files: ${{ matrix.renamed_bin }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
